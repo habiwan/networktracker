@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Network Audit Tracker</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #1e1e2e; color: #cdd6f4; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        h2 { border-bottom: 2px solid #313244; padding-bottom: 0.5rem; }
+        .controls { margin-top: 1rem; display: flex; gap: 10px; }
+        .form-group { display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        input, select, button { padding: 8px 12px; background: #313244; border: 1px solid #45475a; color: #cdd6f4; border-radius: 4px; }
+        button { background: #89b4fa; color: #11111b; font-weight: bold; cursor: pointer; border: none; }
+        button.export-btn { background: #a6e3a1; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #313244; }
+        th { cursor: pointer; user-select: none; }
+        th:hover { background: #313244; }
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
+        .type-infrastructure { background: #f38ba8; color: #11111b; }
+        .type-service { background: #fab387; color: #11111b; }
+        .type-client { background: #a6e3a1; color: #11111b; }
+        .type-transient { background: #cba6f7; color: #11111b; }
+    </style>
+</head>
+<body>
+
+    <h2>Network Audit Tracker</h2>
+    
+    <form class="form-group" id="addForm">
+        <input type="text" id="hostname" placeholder="Hostname" required>
+        <input type="text" id="ip" placeholder="IP" required>
+        <input type="text" id="mac" placeholder="MAC Address" required>
+        <select id="type">
+            <option value="Infrastructure">Infrastructure</option>
+            <option value="Service">Service</option>
+            <option value="Client">Client</option>
+            <option value="Transient">Transient</option>
+        </select>
+        <button type="submit">Add Device</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Hostname</th>
+                <th onclick="sortTable()">IP Address ↕️</th>
+                <th>MAC Address</th>
+                <th>Type</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <div class="controls">
+        <button class="export-btn" onclick="exportToCSV()">Export Data to CSV File</button>
+    </div>
+
+    <script>
+        let devices = JSON.parse(localStorage.getItem('networkAuditData')) || [];
+        let sortAscending = true;
+        const tableBody = document.getElementById('tableBody');
+
+        function ipToNumber(ip) {
+            return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+        }
+
+        function renderTable() {
+            tableBody.innerHTML = '';
+            devices.forEach(device => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${device.hostname}</td>
+                    <td>${device.ip}</td>
+                    <td>${device.mac}</td>
+                    <td><span class="badge type-${device.type.toLowerCase()}">${device.type}</span></td>
+                    <td><button onclick="deleteDevice(${device.id})">Del</button></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            localStorage.setItem('networkAuditData', JSON.stringify(devices));
+        }
+
+        function sortTable() {
+            devices.sort((a, b) => {
+                const ipA = ipToNumber(a.ip);
+                const ipB = ipToNumber(b.ip);
+                return sortAscending ? ipA - ipB : ipB - ipA;
+            });
+            sortAscending = !sortAscending;
+            renderTable();
+        }
+
+        function exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Hostname,IP,MAC,Type\n";
+            devices.forEach(d => {
+                csvContent += `${d.hostname},${d.ip},${d.mac},${d.type}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "network_audit.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+
+        function deleteDevice(id) {
+            devices = devices.filter(d => d.id !== id);
+            renderTable();
+        }
+
+        document.getElementById('addForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            devices.push({
+                id: Date.now(),
+                hostname: document.getElementById('hostname').value,
+                ip: document.getElementById('ip').value,
+                mac: document.getElementById('mac').value.toUpperCase(),
+                type: document.getElementById('type').value
+            });
+            renderTable();
+            document.getElementById('addForm').reset();
+        });
+
+        renderTable();
+    </script>
+</body>
+</html>
